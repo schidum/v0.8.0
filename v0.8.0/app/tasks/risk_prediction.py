@@ -2,14 +2,17 @@
 # ФАЙЛ: app/tasks/risk_prediction.py – прогнозирование рисков для полей (Celery)
 # =============================================================================
 from celery import shared_task
-import asyncio
 import random
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
 from app.database import AsyncSessionLocal
 from app.models import Field, RiskType, RiskPrediction
 from app.services import RiskPredictionService
 from app.schemas import RiskPredictionCreate
+from app.tasks.async_runner import run_async_task
+
+logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=60)
 def generate_risk_predictions(self, field_ids: List[int] = None):

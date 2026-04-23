@@ -1,6 +1,9 @@
 # app/celery_app.py
 from celery import Celery
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 celery_app = Celery(
     "agro_tasks",
@@ -26,6 +29,6 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
 )
 
-print("✅ Celery запущен с RabbitMQ 3.6.6 (Windows 7 32-bit)")
-print(f"   Broker : {settings.RABBITMQ_URL}")
-print(f"   Backend: {settings.CELERY_RESULT_BACKEND}")
+logger.info("✅ Celery initialized with RabbitMQ 3.6.6 (Windows 7 32-bit)")
+logger.info(f"   Broker : {settings.RABBITMQ_URL}")
+logger.info(f"   Backend: {settings.CELERY_RESULT_BACKEND}")
