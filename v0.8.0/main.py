@@ -4,18 +4,22 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 import uvicorn
+import logging
 from pathlib import Path
 
+from app.config import settings
 from app.database import init_db, AsyncSessionLocal
 from app.routers import api_router
 from app.repositories import PersonRepository
 from app.services import AuthService
 from app.models import Person, PersonRole, RoleEnum
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
-    title="Агро API — Точное земледелие",
-    version="0.8.0",
-    description=" веб API и мобильный API CQRS, Celery, RabbitMQ , Ownership, WebSocket"
+    title=settings.APP_TITLE,
+    version=settings.APP_VERSION,
+    description="веб API и мобильный API CQRS, Celery, RabbitMQ, Ownership, WebSocket"
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -53,13 +57,19 @@ async def admin_page():
 async def admin_page_html():
     return FileResponse("admin.html")
 
+
+# ==================== CORS CONFIGURATION ====================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-App-Client"],
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
+    max_age=settings.CORS_MAX_AGE,
 )
+
+logger.info(f"CORS configured for environment: {settings.ENVIRONMENT}")
+logger.info(f"Allowed origins: {settings.cors_origins_list}")
 
 app.include_router(api_router)
 

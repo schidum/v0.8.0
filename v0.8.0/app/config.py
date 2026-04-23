@@ -4,6 +4,16 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # ==================== ENVIRONMENT ====================
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Environment: development, staging, production"
+    )
+    DEBUG: bool = Field(
+        default=False,
+        description="Enable debug mode"
+    )
+
     # База данных
     DATABASE_URL: str = "sqlite+aiosqlite:///./agro.db"
 
@@ -24,9 +34,38 @@ class Settings(BaseSettings):
     # Backend результатов — rpc (работает через тот же RabbitMQ, Redis не нужен)
     CELERY_RESULT_BACKEND: str = "rpc://"
 
+    # ==================== CORS CONFIGURATION ====================
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:8000,http://127.0.0.1:8000",
+        description="Comma-separated list of allowed origins for CORS"
+    )
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        default=True,
+        description="Allow credentials in CORS requests"
+    )
+    CORS_ALLOW_METHODS: list = Field(
+        default=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+        description="HTTP methods allowed in CORS requests"
+    )
+    CORS_ALLOW_HEADERS: list = Field(
+        default=["Authorization", "Content-Type", "X-App-Client"],
+        description="Headers allowed in CORS requests"
+    )
+    CORS_MAX_AGE: int = Field(
+        default=600,
+        description="Max age for CORS preflight cache (seconds)"
+    )
+
     # Приложение
     APP_TITLE: str = "Агро API — Точное земледелие"
-    APP_VERSION: str = "0.3.2"
+    APP_VERSION: str = "0.8.0"
+
+    @property
+    def cors_origins_list(self) -> list:
+        """Parse CORS origins from comma-separated string."""
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        # Remove empty strings
+        return [o for o in origins if o]
 
     class Config:
         env_file = ".env"
