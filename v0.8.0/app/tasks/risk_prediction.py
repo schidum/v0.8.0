@@ -17,7 +17,11 @@ def generate_risk_predictions(self, field_ids: List[int] = None):
     Фоновая задача: вычисляет вероятности рисков (засуха, болезни) для заданных полей.
     Если field_ids = None – для всех полей.
     Результат сохраняется в таблицу risk_predictions.
+    Использует безопасный async runner для предотвращения конфликтов event loop.
     """
+    from app.tasks.async_runner import run_async_task
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         async def _run():
             async with AsyncSessionLocal() as db:
@@ -80,10 +84,11 @@ def generate_risk_predictions(self, field_ids: List[int] = None):
                     "field_ids": field_ids,
                     "predictions_count": len(created_predictions)
                 })
+                logger.info(f"Risk predictions generated for {len(field_ids)} fields")
                 return {"status": "success", "fields_processed": len(field_ids), "predictions_created": len(created_predictions)}
 
-        return asyncio.run(_run())
+        return run_async_task(_run())
 
     except Exception as exc:
-        print(f"Ошибка в задаче прогнозирования: {exc}")
+        logger.error(f"Error in risk prediction task: {exc}", exc_info=True)
         raise self.retry(exc=exc)
