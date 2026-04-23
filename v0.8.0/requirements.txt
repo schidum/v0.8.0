@@ -1,0 +1,12 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+aiosqlite==0.20.0
+alembic==1.13.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-jose[cryptography]==3.3.0
+# Хэширование паролей: PBKDF2-SHA256 (встроен, не требует C-расширений)
+# Работает на 32-разрядном Python 3.8 на Windows без дополнительных пакетов
+passlib==1.7.4
+python-multipart==0.0.9

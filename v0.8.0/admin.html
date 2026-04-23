@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Агро API — Панель управления</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Leaflet для карты -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    .tab-button.active { border-bottom: 3px solid #10b981; color: #10b981; }
+    #map { height: 500px; border-radius: 20px; }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans">
+
+<div class="max-w-7xl mx-auto p-6">
+  <h1 class="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+    <i class="fas fa-seedling text-emerald-600"></i> Агро API — Полное управление
+  </h1>
+
+  <!-- Логин -->
+  <div id="loginPanel" class="max-w-md mx-auto bg-white p-8 rounded-3xl shadow">
+    <h2 class="text-2xl font-semibold mb-6 text-center">Вход в систему</h2>
+    <input id="login_input" type="text" value="admin" class="w-full p-4 border rounded-2xl mb-3">
+    <input id="password_input" type="password" value="admin" class="w-full p-4 border rounded-2xl mb-6">
+    <button onclick="login()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-medium text-lg">
+      Войти
+    </button>
+  </div>
+
+  <!-- Основная панель -->
+  <div id="mainPanel" class="hidden">
+    <div class="flex justify-between items-center mb-6">
+      <div id="userInfo" class="text-lg font-medium"></div>
+      <button onclick="logout()" class="text-red-600 hover:text-red-700 flex items-center gap-2">
+        <i class="fas fa-sign-out-alt"></i> Выйти
+      </button>
+    </div>
+
+    <!-- Табы -->
+    <div class="flex border-b mb-6 overflow-x-auto">
+      <button onclick="showTab(0)" id="tab0" class="tab-button active px-6 py-3 font-medium">👥 Пользователи</button>
+      <button onclick="showTab(1)" id="tab1" class="tab-button px-6 py-3 font-medium">🗺 Карта полей</button>
+      <button onclick="showTab(2)" id="tab2" class="tab-button px-6 py-3 font-medium">🚜 Техника</button>
+      <button onclick="showTab(3)" id="tab3" class="tab-button px-6 py-3 font-medium">📋 Задания</button>
+      <button onclick="showTab(4)" id="tab4" class="tab-button px-6 py-3 font-medium">📄 PDF-отчёты</button>
+    </div>
+
+    <!-- TAB 1: Карта полей + реал-тайм техника -->
+    <div id="tabContent1">
+      <div id="map" class="shadow-lg"></div>
+    </div>
+
+    <!-- TAB 2: Техника -->
+    <div id="tabContent2" class="hidden">
+      <h2 class="text-xl font-semibold mb-4">Техника в реальном времени</h2>
+      <table class="w-full bg-white rounded-3xl shadow overflow-hidden" id="equipmentTable">
+        <thead class="bg-gray-100"><tr><th>Название</th><th>Водитель</th><th>Пробег</th><th>Позиция</th><th>Обновлено</th></tr></thead>
+        <tbody id="equipmentBody" class="divide-y"></tbody>
+      </table>
+    </div>
+
+    <!-- TAB 3: Задания -->
+    <div id="tabContent3" class="hidden">
+      <button onclick="showCreateTaskModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 mb-4">
+        <i class="fas fa-plus"></i> Назначить задание
+      </button>
+      <table class="w-full bg-white rounded-3xl shadow overflow-hidden" id="tasksTable">
+        <thead class="bg-gray-100">
+          <tr><th>Задание</th><th>Статус</th><th>Назначено</th><th>Исполнитель</th><th>Результат</th><th>Действия</th></tr>
+        </thead>
+        <tbody id="tasksBody" class="divide-y"></tbody>
+      </table>
+    </div>
+
+    <!-- TAB 4: PDF-отчёты -->
+    <div id="tabContent4" class="hidden">
+      <button onclick="generateReport()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl mb-4">
+        Создать PDF-отчёт по выполненным работам
+      </button>
+      <div id="reportStatus" class="mt-6 text-lg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно создания задания -->
+<div id="taskModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+  <div class="bg-white rounded-3xl p-8 w-full max-w-lg">
+    <h3 class="text-2xl font-semibold mb-6">Новое задание</h3>
+    <input id="task_title" placeholder="Название задания" class="w-full p-4 border rounded-2xl mb-4">
+    <textarea id="task_desc" placeholder="Описание" class="w-full p-4 border rounded-2xl mb-4 h-24"></textarea>
+    
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <select id="task_assigned_to" class="p-4 border rounded-2xl"></select>
+      <select id="task_equipment" class="p-4 border rounded-2xl"></select>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="hideTaskModal()" class="flex-1 py-4 border rounded-2xl font-medium">Отмена</button>
+      <button onclick="createTask()" class="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-medium">Назначить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==================
+const API_BASE = "http://127.0.0.1:8000/api/v1";
+let token = null;
+let map = null;
+let equipmentMarkers = {};
+
+// ================== АВТОРИЗАЦИЯ ==================
+async function login() {
+  const loginVal = document.getElementById("login_input").value.trim();
+  const passVal = document.getElementById("password_input").value.trim();
+
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ login: loginVal, password: passVal })
+  });
+
+  if (!res.ok) return alert("Неверный логин или пароль");
+
+  const data = await res.json();
+  token = data.access_token;
+
+  document.getElementById("loginPanel").classList.add("hidden");
+  document.getElementById("mainPanel").classList.remove("hidden");
+  document.getElementById("userInfo").innerHTML = `👤 <span class="font-semibold">${loginVal}</span>`;
+
+  connectWebSocket();
+  showTab(1); // сразу открываем карту
+  await loadAllData();
+}
+
+// ================== WEBSOCKET (реал-тайм техника) ==================
+let ws = null;
+function connectWebSocket() {
+  ws = new WebSocket(`ws://127.0.0.1:8000/api/v1/ws/connect`);
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === "equipment_position_updated") {
+      updateEquipmentMarker(msg.equipment);
+    }
+    if (msg.type === "task_updated" || msg.type === "task_created") {
+      loadTasks();
+    }
+  };
+  ws.onclose = () => setTimeout(connectWebSocket, 3000);
+}
+
+// ================== ТАБЫ ==================
+function showTab(n) {
+  document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab${n}`).classList.add('active');
+
+  document.querySelectorAll('#mainPanel > div[id^="tabContent"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById(`tabContent${n}`).classList.remove('hidden');
+
+  if (n === 1 && !map) initMap();
+}
+
+// ================== КАРТА (Leaflet) ==================
+function initMap() {
+  map = L.map('map').setView([55.8, 37.5], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // Загружаем поля и технику
+  loadFieldsOnMap();
+  loadEquipmentOnMap();
+}
+
+async function loadFieldsOnMap() {
+  const res = await fetch(`${API_BASE}/fields/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const fields = await res.json();
+  fields.forEach(f => {
+    if (f.boundary_points && f.boundary_points.length > 2) {
+      const coords = f.boundary_points.map(p => [p.latitude, p.longitude]);
+      L.polygon(coords, { color: '#10b981', weight: 3 }).addTo(map).bindPopup(f.name);
+    }
+  });
+}
+
+async function loadEquipmentOnMap() {
+  const res = await fetch(`${API_BASE}/equipment/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const equipment = await res.json();
+  equipment.forEach(eq => {
+    if (eq.current_latitude && eq.current_longitude) {
+      const marker = L.marker([eq.current_latitude, eq.current_longitude])
+        .addTo(map)
+        .bindPopup(`<b>${eq.name}</b><br>Водитель: ${eq.assigned_driver ? eq.assigned_driver.full_name : '—'}`);
+      equipmentMarkers[eq.id] = marker;
+    }
+  });
+}
+
+function updateEquipmentMarker(eq) {
+  if (equipmentMarkers[eq.id]) {
+    equipmentMarkers[eq.id].setLatLng([eq.latitude, eq.longitude]);
+  } else if (map) {
+    const marker = L.marker([eq.latitude, eq.longitude]).addTo(map);
+    equipmentMarkers[eq.id] = marker;
+  }
+}
+
+// ================== ЗАГРУЗКА ДАННЫХ ==================
+async function loadAllData() {
+  await loadUsers();
+  await loadEquipment();
+  await loadTasks();
+}
+
+async function loadEquipment() {
+  const res = await fetch(`${API_BASE}/equipment/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const data = await res.json();
+  renderEquipmentTable(data);
+}
+
+async function loadTasks() {
+  const res = await fetch(`${API_BASE}/tasks/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const data = await res.json();
+  renderTasksTable(data);
+}
+
+// ================== РЕНДЕР ТАБЛИЦ ==================
+function renderEquipmentTable(data) {
+  const tbody = document.getElementById("equipmentBody");
+  tbody.innerHTML = data.map(eq => `
+    <tr class="hover:bg-gray-50">
+      <td class="px-6 py-4">${eq.name}</td>
+      <td class="px-6 py-4">${eq.assigned_driver ? eq.assigned_driver.full_name : '—'}</td>
+      <td class="px-6 py-4">${eq.current_mileage} км</td>
+      <td class="px-6 py-4">${eq.current_latitude ? eq.current_latitude.toFixed(4) + ', ' + eq.current_longitude.toFixed(4) : '—'}</td>
+      <td class="px-6 py-4 text-sm text-gray-500">${eq.last_position_update ? new Date(eq.last_position_update).toLocaleString('ru-RU') : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderTasksTable(data) {
+  const tbody = document.getElementById("tasksBody");
+  tbody.innerHTML = data.map(t => `
+    <tr class="hover:bg-gray-50">
+      <td class="px-6 py-4 font-medium">${t.title}</td>
+      <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs ${t.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${t.status}</span></td>
+      <td class="px-6 py-4">${t.assigned_by_name || '—'}</td>
+      <td class="px-6 py-4">${t.assigned_to_name || '—'}</td>
+      <td class="px-6 py-4">${t.result_comment || '—'}</td>
+      <td class="px-6 py-4">
+        ${t.status !== 'completed' ? `<button onclick="markCompleted(${t.id})" class="text-emerald-600 hover:text-emerald-700"><i class="fas fa-check"></i></button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ================== СОЗДАНИЕ ЗАДАНИЯ ==================
+async function showCreateTaskModal() {
+  // Загружаем пользователей и технику для выбора
+  const usersRes = await fetch(`${API_BASE}/persons/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const users = await usersRes.json();
+  const eqRes = await fetch(`${API_BASE}/equipment/`, { headers: { "Authorization": `Bearer ${token}` }});
+  const equipment = await eqRes.json();
+
+  const selectUser = document.getElementById("task_assigned_to");
+  selectUser.innerHTML = users.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+
+  const selectEq = document.getElementById("task_equipment");
+  selectEq.innerHTML = `<option value="">Без техники</option>` + equipment.map(eq => `<option value="${eq.id}">${eq.name}</option>`).join('');
+
+  document.getElementById("taskModal").classList.remove("hidden");
+}
+
+function hideTaskModal() {
+  document.getElementById("taskModal").classList.add("hidden");
+}
+
+async function createTask() {
+  const payload = {
+    title: document.getElementById("task_title").value,
+    description: document.getElementById("task_desc").value,
+    assigned_to_id: parseInt(document.getElementById("task_assigned_to").value),
+    equipment_id: document.getElementById("task_equipment").value ? parseInt(document.getElementById("task_equipment").value) : null
+  };
+
+  await fetch(`${API_BASE}/tasks/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+  hideTaskModal();
+  loadTasks();
+}
+
+// ================== ОТМЕТКА ВЫПОЛНЕНИЯ ==================
+async function markCompleted(taskId) {
+  const comment = prompt("Введите комментарий к выполнению:");
+  if (!comment) return;
+
+  await fetch(`${API_BASE}/tasks/${taskId}/complete`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ result_comment: comment })
+  });
+
+  loadTasks();
+}
+
+// ================== PDF-ОТЧЁТ (Celery) ==================
+async function generateReport() {
+  const res = await fetch(`${API_BASE}/reports/generate`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "X-App-Client": "web" }
+  });
+  const { task_id } = await res.json();
+
+  const statusDiv = document.getElementById("reportStatus");
+  statusDiv.innerHTML = `Задача <b>${task_id}</b> запущена в Celery...<br>Ожидаем завершения...`;
+
+  const interval = setInterval(async () => {
+    const statusRes = await fetch(`${API_BASE}/tasks/${task_id}`, { headers: { "Authorization": `Bearer ${token}` }});
+    const statusData = await statusRes.json();
+
+    if (statusData.status === "SUCCESS" && statusData.result?.report_url) {
+      clearInterval(interval);
+      statusDiv.innerHTML += `<br><a href="${statusData.result.report_url}" target="_blank" class="text-emerald-600 underline text-lg">✅ Скачать PDF-отчёт</a>`;
+    }
+  }, 1500);
+}
+
+// ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
+function logout() {
+  token = null;
+  document.getElementById("mainPanel").classList.add("hidden");
+  document.getElementById("loginPanel").classList.remove("hidden");
+  if (ws) ws.close();
+}
+
+// Запуск
+window.onload = () => {
+  // Можно добавить авто-логин для теста, но оставляем ручной вход
+};
+</script>
+</body>
+</html>
