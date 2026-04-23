@@ -48,35 +48,71 @@ class PersonRepository:
         return result.scalars().all()
 
     async def create(self, person: Person) -> Person:
-        self.db.add(person)
-        await self.db.commit()
-        await self.db.refresh(person)
-        # Перезагружаем с ролями
-        return await self.get_by_id(person.id)
+        from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            self.db.add(person)
+            await self.db.commit()
+            await self.db.refresh(person)
+            # Перезагружаем с ролями
+            return await self.get_by_id(person.id)
+        except IntegrityError as e:
+            await self.db.rollback()
+            logger.error(f"Database integrity error creating person: {e}")
+            raise ValueError(f"Person with login '{person.login}' already exists")
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error creating person: {e}")
+            raise
 
     async def update(self, person: Person) -> Person:
-        await self.db.commit()
-        return await self.get_by_id(person.id)
+        from sqlalchemy.exc import SQLAlchemyError
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            await self.db.commit()
+            return await self.get_by_id(person.id)
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error updating person: {e}")
+            raise
 
     async def set_roles(self, person: Person, roles: List[RoleEnum]) -> None:
         """
         Полностью заменить набор ролей пользователя.
         Удаляем старые записи, вставляем новые.
         """
-        # Удалить все текущие роли
-        for pr in list(person.roles):
-            await self.db.delete(pr)
-        await self.db.flush()
-        # Добавить новые — через person.roles.append(), а не db.add()
-        # db.add() пишет тоۓько в сессию, НЕ обновляет ORM-коллекцию в памяти
-        for role in roles:
-            pr = PersonRole(person_id=person.id, role=role)
-            person.roles.append(pr)  # FIX: синхронизируем in-memory коллекцию
-        await self.db.flush()
+        from sqlalchemy.exc import SQLAlchemyError
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            # Удалить все текущие роли
+            for pr in list(person.roles):
+                await self.db.delete(pr)
+            await self.db.flush()
+            # Добавить новые — через person.roles.append(), а не db.add()
+            # db.add() пишет только в сессию, НЕ обновляет ORM-коллекцию в памяти
+            for role in roles:
+                pr = PersonRole(person_id=person.id, role=role)
+                person.roles.append(pr)  # синхронизируем in-memory коллекцию
+            await self.db.flush()
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error updating user roles: {e}")
+            raise
 
     async def delete(self, person: Person) -> None:
-        await self.db.delete(person)
-        await self.db.commit()
+        from sqlalchemy.exc import SQLAlchemyError
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            await self.db.delete(person)
+            await self.db.commit()
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error deleting person: {e}")
+            raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════

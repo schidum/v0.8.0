@@ -65,23 +65,39 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 async def create_default_superuser():
-    async with AsyncSessionLocal() as db:
-        repo = PersonRepository(db)
-        admin = await repo.get_by_login("admin")
-        if not admin:
-            admin_user = Person(
-                full_name="Супер Администратор",
-                login="admin",
-                password_hash=AuthService.hash_password("admin"),
-                is_active=True,
-            )
-            admin_user.roles.extend([
-                PersonRole(role=RoleEnum.manager),
-                PersonRole(role=RoleEnum.chemist),
-                PersonRole(role=RoleEnum.agronomist)
-            ])
-            await repo.create(admin_user)
-            print("Суперюзер admin/admin создан")
+    """Create default admin user on startup if not exists."""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        async with AsyncSessionLocal() as db:
+            repo = PersonRepository(db)
+            try:
+                admin = await repo.get_by_login("admin")
+            except Exception as e:
+                logger.error(f"Error checking for existing admin user: {e}")
+                return
+            
+            if not admin:
+                try:
+                    admin_user = Person(
+                        full_name="Супер Администратор",
+                        login="admin",
+                        password_hash=AuthService.hash_password("admin"),
+                        is_active=True,
+                    )
+                    admin_user.roles.extend([
+                        PersonRole(role=RoleEnum.manager),
+                        PersonRole(role=RoleEnum.chemist),
+                        PersonRole(role=RoleEnum.agronomist)
+                    ])
+                    await repo.create(admin_user)
+                    logger.info("Default admin user created successfully (admin/admin)")
+                except Exception as e:
+                    logger.error(f"Failed to create default admin user: {e}")
+            else:
+                logger.info("Admin user already exists")
+    except Exception as e:
+        logger.error(f"Critical error in startup admin creation: {e}")
 
 @app.get("/")
 async def root():

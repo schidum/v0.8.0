@@ -4,13 +4,17 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 from app.schemas import LoginRequest
 
 from fastapi import Request
 
 from collections import defaultdict
 import time
+import logging
 from fastapi import Request, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models import Person, RoleEnum, MapTypeEnum
@@ -34,11 +38,21 @@ async def get_current_person(
     try:
         payload = AuthService.decode_token(credentials.credentials)
         person_id = int(payload["sub"])
-    except (JWTError, KeyError, ValueError):
+    except (JWTError, KeyError, ValueError) as e:
+        logger.debug(f"Token validation failed: {e}")
         raise exc
 
-    person = await PersonRepository(db).get_by_id(person_id)
+    try:
+        person = await PersonRepository(db).get_by_id(person_id)
+    except SQLAlchemyError as e:
+        logger.error(f"Database error while fetching user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service temporarily unavailable",
+        )
+    
     if not person or not person.is_active:
+        logger.warning(f"User {person_id} not found or inactive")
         raise exc
     return person
 
